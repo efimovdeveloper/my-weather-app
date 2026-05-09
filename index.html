@@ -236,8 +236,12 @@
                                 <div class="detail-value" id="pressure">--</div>
                             </div>
                             <div class="detail-item">
-                                <div class="detail-label"><i class="fas fa-eye"></i> Visibility</div>
-                                <div class="detail-value" id="visibility">--</div>
+                                <div class="detail-label"><i class="fas fa-sunrise"></i> Sunrise</div>
+                                <div class="detail-value" id="sunrise">--</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="detail-label"><i class="fas fa-sunset"></i> Sunset</div>
+                                <div class="detail-value" id="sunset">--</div>
                             </div>
                         </div>
                     </div>
@@ -261,7 +265,7 @@
     <script>
         const LOCATION_LAT = 32.8169;
         const LOCATION_LON = 35.0739;
-        const API_URL = `https://api.open-meteo.com/v1/forecast?latitude=${LOCATION_LAT}&longitude=${LOCATION_LON}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,pressure_msl,visibility&hourly=temperature_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m,uv_index&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max&temperature_unit=celsius&wind_speed_unit=kmh&precipitation_unit=mm&timezone=auto`;
+        const API_URL = `https://api.open-meteo.com/v1/forecast?latitude=${LOCATION_LAT}&longitude=${LOCATION_LON}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,pressure_msl&hourly=temperature_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m,uv_index&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,sunrise,sunset&temperature_unit=celsius&wind_speed_unit=kmh&precipitation_unit=mm&timezone=auto`;
 
         const WMO_CODES = {
             0: { desc: 'Clear Sky', icon: 'fas fa-sun' },
@@ -333,6 +337,7 @@
             const temps = [];
             const precip = [];
             const uvIndex = [];
+            const windSpeeds = [];
 
             // Parse the time array to get correct hour labels
             for (let i = 0; i < 24; i++) {
@@ -344,6 +349,7 @@
                 temps.push(Math.round(hourly.temperature_2m[i]));
                 precip.push(hourly.precipitation[i] || 0);
                 uvIndex.push(hourly.uv_index[i] || 0);
+                windSpeeds.push(Math.round(hourly.wind_speed_10m[i] || 0));
             }
 
             // Destroy existing chart if it exists
@@ -393,6 +399,18 @@
                             pointRadius: 3,
                             pointBackgroundColor: '#ff9800',
                             yAxisID: 'y2'
+                        },
+                        {
+                            label: 'Wind Speed (km/h)',
+                            data: windSpeeds,
+                            borderColor: '#4caf50',
+                            backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 3,
+                            pointBackgroundColor: '#4caf50',
+                            yAxisID: 'y3'
                         }
                     ]
                 },
@@ -467,6 +485,25 @@
                                 color: getComputedStyle(document.body).color
                             }
                         },
+                        y3: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            offset: true,
+                            title: {
+                                display: true,
+                                text: 'Wind Speed (km/h)',
+                                color: getComputedStyle(document.body).color
+                            },
+                            beginAtZero: true,
+                            max: Math.max(...windSpeeds) * 1.2 || 15,
+                            grid: {
+                                drawOnChartArea: false
+                            },
+                            ticks: {
+                                color: getComputedStyle(document.body).color
+                            }
+                        },
                         x: {
                             grid: {
                                 color: 'rgba(255, 255, 255, 0.1)'
@@ -512,7 +549,14 @@
             document.getElementById('windSpeed').textContent = Math.round(current.wind_speed_10m) + ' km/h';
             document.getElementById('humidity').textContent = current.relative_humidity_2m + '%';
             document.getElementById('pressure').textContent = Math.round(current.pressure_msl) + ' mb';
-            document.getElementById('visibility').textContent = (current.visibility / 1000).toFixed(1) + ' km';
+            
+            // Set sunrise and sunset from today's daily data
+            if (daily && daily.sunrise && daily.sunset) {
+                const sunriseTime = new Date(daily.sunrise[0]);
+                const sunsetTime = new Date(daily.sunset[0]);
+                document.getElementById('sunrise').textContent = sunriseTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+                document.getElementById('sunset').textContent = sunsetTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            }
             
             // Apply weather-based background color
             const bgColor = getWeatherBackground(current.weather_code);
@@ -540,16 +584,29 @@
             const container = document.getElementById('dailyForecast');
             container.innerHTML = '';
 
+            // Get current hour to only show future hours
             const now = new Date();
-            const hoursToShow = 24;
+            const currentHour = now.getHours();
 
-            for (let i = 0; i < hoursToShow; i++) {
-                const time = new Date(now.getTime() + i * 60 * 60 * 1000);
-                const hour = time.getHours().toString().padStart(2, '0');
+            // Start from current hour onwards, but limit to 18 cards
+            let cardsDisplayed = 0;
+            for (let i = 0; i < hourly.time.length && cardsDisplayed < 18; i++) {
+                const timeStr = hourly.time[i];
+                const time = new Date(timeStr);
+                const timeHour = time.getHours();
+
+                // Skip past hours (earlier than current hour)
+                if (time.toDateString() === now.toDateString() && timeHour < currentHour) {
+                    continue;
+                }
+
+                const hour = timeHour.toString().padStart(2, '0');
                 const temp = Math.round(hourly.temperature_2m[i]);
                 const weatherCode = hourly.weather_code[i];
                 const weatherInfo = getWeatherInfo(weatherCode);
                 const precipitation = hourly.precipitation_probability[i] || 0;
+                const windSpeed = Math.round(hourly.wind_speed_10m[i]);
+                const windStyle = windSpeed > 20 ? 'color: #ff4444; font-weight: bold; opacity: 1;' : 'opacity: 0.7;';
 
                 const card = document.createElement('div');
                 card.className = 'col-lg-2 col-md-3 col-sm-4 col-6 mb-3';
@@ -560,9 +617,11 @@
                         <div class="forecast-temp">${temp}°C</div>
                         <div class="forecast-desc">${weatherInfo.desc}</div>
                         <small style="opacity: 0.7;"><i class="fas fa-droplet"></i> ${precipitation}%</small>
+                        <small style="display: block; margin-top: 5px; ${windStyle}"><i class="fas fa-wind"></i> ${windSpeed} km/h</small>
                     </div>
                 `;
                 container.appendChild(card);
+                cardsDisplayed++;
             }
         }
 
@@ -581,6 +640,7 @@
                 const weatherInfo = getWeatherInfo(weatherCode);
                 const precipitation = Math.round(daily.precipitation_sum[i] || 0);
                 const windSpeed = Math.round(daily.wind_speed_10m_max[i]);
+                const windStyle = windSpeed > 20 ? 'color: #ff4444; font-weight: bold; opacity: 1;' : 'opacity: 0.7;';
 
                 const card = document.createElement('div');
                 card.className = 'col-lg-1-7 col-md-2 col-sm-3 col-6 mb-3';
@@ -593,7 +653,7 @@
                         <div class="forecast-desc" style="font-size: 0.85em; margin-bottom: 8px;">${weatherInfo.desc}</div>
                         <div class="forecast-temp" style="font-size: 1.1em;">${tempMax}°/${tempMin}°</div>
                         <small style="display: block; margin: 5px 0;">💧 ${precipitation}mm</small>
-                        <small style="opacity: 0.7;"><i class="fas fa-wind"></i> ${windSpeed}km/h</small>
+                        <small style="display: block; ${windStyle}"><i class="fas fa-wind"></i> ${windSpeed}km/h</small>
                     </div>
                 `;
                 container.appendChild(card);
