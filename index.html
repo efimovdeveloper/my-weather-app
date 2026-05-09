@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weather in Kiryat Yam, Israel</title>
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/3.9.1/chart.min.js"></script>
+    <style>
+        :root {
+            --primary-color: #007bff;
+            --bg-color: #ffffff;
+            --text-color: #000000;
+            --card-bg: #f8f9fa;
+            --border-color: #dee2e6;
+        }
+
+        [data-bs-theme="dark"] {
+            --primary-color: #0d6efd;
+            --bg-color: #1a1a1a;
+            --text-color: #ffffff;
+            --card-bg: #2d2d2d;
+            --border-color: #444;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-color);
+            transition: background-color 0.3s, color 0.3s;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        .navbar {
+            background-color: var(--card-bg) !important;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        .weather-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+
+        .current-weather {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+        }
+
+        [data-bs-theme="dark"] .current-weather {
+            background: linear-gradient(135deg, #2d3561 0%, #4a2e5a 100%);
+        }
+
+        .current-weather h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+
+        .temperature {
+            font-size: 3.5em;
+            font-weight: bold;
+            margin: 20px 0;
+        }
+
+        .weather-icon {
+            font-size: 4em;
+            margin: 20px 0;
+        }
+
+        .weather-details {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+            gap: 15px;
+            margin-top: 20px;
+        }
+
+        .detail-item {
+            background: rgba(255,255,255,0.1);
+            padding: 15px;
+            border-radius: 10px;
+            backdrop-filter: blur(10px);
+        }
+
+        .detail-label {
+            font-size: 0.9em;
+            opacity: 0.9;
+            margin-bottom: 5px;
+        }
+
+        .detail-value {
+            font-size: 1.3em;
+            font-weight: bold;
+        }
+
+        .forecast-card {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 15px;
+            text-align: center;
+            transition: transform 0.3s, box-shadow 0.3s;
+        }
+
+        .forecast-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+        }
+
+        .forecast-day {
+            font-weight: bold;
+            margin-bottom: 10px;
+        }
+
+        .forecast-temp {
+            font-size: 1.3em;
+            margin: 10px 0;
+        }
+
+        .forecast-icon {
+            font-size: 2em;
+            margin: 10px 0;
+        }
+
+        .forecast-desc {
+            font-size: 0.9em;
+            opacity: 0.8;
+        }
+
+        .section-title {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin: 30px 0 20px 0;
+            padding-bottom: 10px;
+            border-bottom: 2px solid var(--primary-color);
+        }
+
+        .loading {
+            text-align: center;
+            padding: 40px;
+        }
+
+        .spinner {
+            width: 50px;
+            height: 50px;
+            border: 5px solid var(--card-bg);
+            border-top: 5px solid var(--primary-color);
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        .error-message {
+            background-color: #f8d7da;
+            color: #721c24;
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+            border: 1px solid #f5c6cb;
+        }
+
+        [data-bs-theme="dark"] .error-message {
+            background-color: #3a2424;
+            color: #f8d7da;
+            border-color: #5a3434;
+        }
+
+        .location-info {
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .location-info h2 {
+            font-size: 2em;
+            margin-bottom: 5px;
+        }
+
+        .location-info p {
+            opacity: 0.8;
+            font-size: 0.95em;
+        }
+    </style>
+</head>
+<body data-bs-theme="dark">
+    <nav class="navbar navbar-expand-lg navbar-light">
+        <div class="container-fluid">
+            <span class="navbar-brand">
+                <i class="fas fa-cloud"></i> Weather Forecast
+            </span>
+        </div>
+    </nav>
+
+    <div class="weather-container">
+        <div class="location-info">
+            <h2><i class="fas fa-map-marker-alt"></i> Kiryat Yam, Israel</h2>
+            <p id="currentDateTime"></p>
+        </div>
+
+        <div id="loadingContainer" class="loading">
+            <div class="spinner"></div>
+            <p style="margin-top: 20px;">Loading weather data...</p>
+        </div>
+
+        <div id="errorContainer"></div>
+
+        <div id="weatherContent" style="display: none;">
+            <!-- Current Weather -->
+            <div class="current-weather">
+                <div class="row">
+                    <div class="col-md-6">
+                        <h1 id="currentDescription">Loading...</h1>
+                        <div class="temperature" id="currentTemp">--°C</div>
+                        <div class="weather-icon" id="currentIcon">
+                            <i class="fas fa-cloud"></i>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="weather-details">
+                            <div class="detail-item">
+                                <div class="detail-label"><i class="fas fa-wind"></i> Wind Speed</div>
+                                <div class="detail-value" id="windSpeed">--</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="detail-label"><i class="fas fa-droplet"></i> Humidity</div>
+                                <div class="detail-value" id="humidity">--</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="detail-label"><i class="fas fa-gauge"></i> Pressure</div>
+                                <div class="detail-value" id="pressure">--</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="detail-label"><i class="fas fa-eye"></i> Visibility</div>
+                                <div class="detail-value" id="visibility">--</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Daily Forecast -->
+            <div class="section-title">Today's Hourly Forecast</div>
+            <div style="background-color: var(--card-bg); padding: 20px; border-radius: 10px; margin-bottom: 20px;">
+                <canvas id="temperatureChart" style="max-height: 300px;"></canvas>
+            </div>
+            <div class="row" id="dailyForecast"></div>
+
+            <!-- Weekly Forecast -->
+            <div class="section-title">7-Day Weekly Forecast</div>
+            <div class="row" id="weeklyForecast"></div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
+    <script>
+        const LOCATION_LAT = 32.8169;
+        const LOCATION_LON = 35.0739;
+        const API_URL = `https://api.open-meteo.com/v1/forecast?latitude=${LOCATION_LAT}&longitude=${LOCATION_LON}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,pressure_msl,visibility&hourly=temperature_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m,uv_index&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max&temperature_unit=celsius&wind_speed_unit=kmh&precipitation_unit=mm&timezone=auto`;
+
+        const WMO_CODES = {
+            0: { desc: 'Clear Sky', icon: 'fas fa-sun' },
+            1: { desc: 'Mostly Clear', icon: 'fas fa-cloud-sun' },
+            2: { desc: 'Partly Cloudy', icon: 'fas fa-cloud-sun' },
+            3: { desc: 'Overcast', icon: 'fas fa-cloud' },
+            45: { desc: 'Foggy', icon: 'fas fa-smog' },
+            48: { desc: 'Depositing Rime Fog', icon: 'fas fa-smog' },
+            51: { desc: 'Light Drizzle', icon: 'fas fa-cloud-rain' },
+            53: { desc: 'Moderate Drizzle', icon: 'fas fa-cloud-rain' },
+            55: { desc: 'Dense Drizzle', icon: 'fas fa-cloud-rain' },
+            61: { desc: 'Slight Rain', icon: 'fas fa-cloud-rain' },
+            63: { desc: 'Moderate Rain', icon: 'fas fa-cloud-rain' },
+            65: { desc: 'Heavy Rain', icon: 'fas fa-cloud-rain' },
+            71: { desc: 'Slight Snow', icon: 'fas fa-snowflake' },
+            73: { desc: 'Moderate Snow', icon: 'fas fa-snowflake' },
+            75: { desc: 'Heavy Snow', icon: 'fas fa-snowflake' },
+            77: { desc: 'Snow Grains', icon: 'fas fa-snowflake' },
+            80: { desc: 'Slight Rain Showers', icon: 'fas fa-cloud-rain' },
+            81: { desc: 'Moderate Rain Showers', icon: 'fas fa-cloud-rain' },
+            82: { desc: 'Violent Rain Showers', icon: 'fas fa-cloud-rain' },
+            85: { desc: 'Slight Snow Showers', icon: 'fas fa-snowflake' },
+            86: { desc: 'Heavy Snow Showers', icon: 'fas fa-snowflake' },
+            95: { desc: 'Thunderstorm', icon: 'fas fa-bolt' },
+            96: { desc: 'Thunderstorm with Slight Hail', icon: 'fas fa-bolt' },
+            99: { desc: 'Thunderstorm with Heavy Hail', icon: 'fas fa-bolt' }
+        };
+
+        function getWeatherInfo(code) {
+            return WMO_CODES[code] || { desc: 'Unknown', icon: 'fas fa-cloud' };
+        }
+
+        function getWeatherBackground(code) {
+            // Returns RGB color based on weather code
+            if (code === 0) {
+                // Clear sky - bright yellow/orange
+                return 'rgba(255, 180, 0, 0.5)';
+            } else if (code === 1 || code === 2) {
+                // Mostly clear or partly cloudy - light blue
+                return 'rgba(100, 180, 255, 0.5)';
+            } else if (code === 3) {
+                // Overcast - gray
+                return 'rgba(150, 150, 150, 0.5)';
+            } else if (code === 45 || code === 48) {
+                // Fog - light gray/white
+                return 'rgba(200, 200, 200, 0.5)';
+            } else if (code >= 51 && code <= 67 || code >= 80 && code <= 82) {
+                // Rain - dark blue
+                return 'rgba(50, 120, 200, 0.5)';
+            } else if (code >= 71 && code <= 77 || code >= 85 && code <= 86) {
+                // Snow - light blue/cyan
+                return 'rgba(150, 200, 255, 0.5)';
+            } else if (code >= 95 && code <= 99) {
+                // Thunderstorm - dark purple
+                return 'rgba(80, 40, 150, 0.5)';
+            }
+            // Default - gray
+            return 'rgba(120, 120, 120, 0.5)';
+        }
+
+        let temperatureChart = null;
+
+        function displayTemperatureChart(hourly) {
+            const ctx = document.getElementById('temperatureChart');
+            if (!ctx) return;
+
+            // Use the time array from the API (which starts at midnight)
+            const hours = [];
+            const temps = [];
+            const precip = [];
+            const uvIndex = [];
+
+            // Parse the time array to get correct hour labels
+            for (let i = 0; i < 24; i++) {
+                // API returns ISO datetime strings - parse them
+                const timeStr = hourly.time[i];
+                const time = new Date(timeStr);
+                const hour = time.getHours().toString().padStart(2, '0') + ':00';
+                hours.push(hour);
+                temps.push(Math.round(hourly.temperature_2m[i]));
+                precip.push(hourly.precipitation[i] || 0);
+                uvIndex.push(hourly.uv_index[i] || 0);
+            }
+
+            // Destroy existing chart if it exists
+            if (temperatureChart) {
+                temperatureChart.destroy();
+            }
+
+            temperatureChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: hours,
+                    datasets: [
+                        {
+                            label: 'Temperature (°C)',
+                            data: temps,
+                            borderColor: '#667eea',
+                            backgroundColor: 'rgba(102, 126, 234, 0.1)',
+                            borderWidth: 3,
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 4,
+                            pointBackgroundColor: '#667eea',
+                            pointBorderColor: '#fff',
+                            pointBorderWidth: 2,
+                            yAxisID: 'y'
+                        },
+                        {
+                            label: 'Precipitation (mm)',
+                            data: precip,
+                            borderColor: '#00bcd4',
+                            backgroundColor: 'rgba(0, 188, 212, 0.2)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 3,
+                            pointBackgroundColor: '#00bcd4',
+                            yAxisID: 'y1'
+                        },
+                        {
+                            label: 'UV Index',
+                            data: uvIndex,
+                            borderColor: '#ff9800',
+                            backgroundColor: 'rgba(255, 152, 0, 0.1)',
+                            borderWidth: 2,
+                            fill: true,
+                            tension: 0.4,
+                            pointRadius: 3,
+                            pointBackgroundColor: '#ff9800',
+                            yAxisID: 'y2'
+                        }
+                    ]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: true,
+                    interaction: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: getComputedStyle(document.body).color,
+                                font: { size: 13 },
+                                usePointStyle: true
+                            }
+                        }
+                    },
+                    scales: {
+                        y: {
+                            type: 'linear',
+                            display: true,
+                            position: 'left',
+                            title: {
+                                display: true,
+                                text: 'Temperature (°C)',
+                                color: getComputedStyle(document.body).color
+                            },
+                            beginAtZero: false,
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: getComputedStyle(document.body).color
+                            }
+                        },
+                        y1: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            title: {
+                                display: true,
+                                text: 'Precipitation (mm)',
+                                color: getComputedStyle(document.body).color
+                            },
+                            beginAtZero: true,
+                            max: Math.max(...precip) * 1.2 || 5,
+                            grid: {
+                                drawOnChartArea: false
+                            },
+                            ticks: {
+                                color: getComputedStyle(document.body).color
+                            }
+                        },
+                        y2: {
+                            type: 'linear',
+                            display: true,
+                            position: 'right',
+                            offset: true,
+                            title: {
+                                display: true,
+                                text: 'UV Index',
+                                color: getComputedStyle(document.body).color
+                            },
+                            beginAtZero: true,
+                            max: Math.max(...uvIndex) * 1.2 || 10,
+                            grid: {
+                                drawOnChartArea: false
+                            },
+                            ticks: {
+                                color: getComputedStyle(document.body).color
+                            }
+                        },
+                        x: {
+                            grid: {
+                                color: 'rgba(255, 255, 255, 0.1)'
+                            },
+                            ticks: {
+                                color: getComputedStyle(document.body).color
+                            }
+                        }
+                    }
+                }
+            });
+        }
+
+        function updateDateTime() {
+            const now = new Date();
+            const options = { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' };
+            document.getElementById('currentDateTime').textContent = now.toLocaleDateString('en-US', options);
+        }
+
+        async function fetchWeather() {
+            try {
+                const response = await fetch(API_URL);
+                if (!response.ok) throw new Error('Weather data fetch failed');
+                
+                const data = await response.json();
+                displayWeather(data);
+            } catch (error) {
+                showError('Failed to load weather data. Please try again later.');
+                console.error(error);
+            }
+        }
+
+        function displayWeather(data) {
+            const current = data.current;
+            const hourly = data.hourly;
+            const daily = data.daily;
+
+            // Update current weather
+            const weatherInfo = getWeatherInfo(current.weather_code);
+            document.getElementById('currentDescription').textContent = weatherInfo.desc;
+            document.getElementById('currentTemp').textContent = Math.round(current.temperature_2m) + '°C';
+            document.getElementById('currentIcon').innerHTML = `<i class="${weatherInfo.icon}"></i>`;
+            document.getElementById('windSpeed').textContent = Math.round(current.wind_speed_10m) + ' km/h';
+            document.getElementById('humidity').textContent = current.relative_humidity_2m + '%';
+            document.getElementById('pressure').textContent = Math.round(current.pressure_msl) + ' mb';
+            document.getElementById('visibility').textContent = (current.visibility / 1000).toFixed(1) + ' km';
+            
+            // Apply weather-based background color
+            const bgColor = getWeatherBackground(current.weather_code);
+            const currentWeatherDiv = document.querySelector('.current-weather');
+            if (currentWeatherDiv) {
+                currentWeatherDiv.style.backgroundColor = bgColor;
+                currentWeatherDiv.style.backgroundBlendMode = 'multiply';
+            }
+
+            // Display hourly forecast (next 24 hours)
+            displayHourlyForecast(hourly);
+
+            // Display weekly forecast
+            displayWeeklyForecast(daily);
+
+            // Show content and hide loading
+            document.getElementById('loadingContainer').style.display = 'none';
+            document.getElementById('weatherContent').style.display = 'block';
+        }
+
+        function displayHourlyForecast(hourly) {
+            // Display temperature chart
+            displayTemperatureChart(hourly);
+
+            const container = document.getElementById('dailyForecast');
+            container.innerHTML = '';
+
+            const now = new Date();
+            const hoursToShow = 24;
+
+            for (let i = 0; i < hoursToShow; i++) {
+                const time = new Date(now.getTime() + i * 60 * 60 * 1000);
+                const hour = time.getHours().toString().padStart(2, '0');
+                const temp = Math.round(hourly.temperature_2m[i]);
+                const weatherCode = hourly.weather_code[i];
+                const weatherInfo = getWeatherInfo(weatherCode);
+                const precipitation = hourly.precipitation_probability[i] || 0;
+
+                const card = document.createElement('div');
+                card.className = 'col-lg-2 col-md-3 col-sm-4 col-6 mb-3';
+                card.innerHTML = `
+                    <div class="forecast-card">
+                        <div class="forecast-day">${hour}:00</div>
+                        <div class="forecast-icon"><i class="${weatherInfo.icon}"></i></div>
+                        <div class="forecast-temp">${temp}°C</div>
+                        <div class="forecast-desc">${weatherInfo.desc}</div>
+                        <small style="opacity: 0.7;"><i class="fas fa-droplet"></i> ${precipitation}%</small>
+                    </div>
+                `;
+                container.appendChild(card);
+            }
+        }
+
+        function displayWeeklyForecast(daily) {
+            const container = document.getElementById('weeklyForecast');
+            container.innerHTML = '';
+
+            for (let i = 0; i < Math.min(7, daily.time.length); i++) {
+                const date = new Date(daily.time[i]);
+                const dayName = date.toLocaleDateString('en-US', { weekday: 'short' });
+                const monthDay = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                
+                const tempMax = Math.round(daily.temperature_2m_max[i]);
+                const tempMin = Math.round(daily.temperature_2m_min[i]);
+                const weatherCode = daily.weather_code[i];
+                const weatherInfo = getWeatherInfo(weatherCode);
+                const precipitation = Math.round(daily.precipitation_sum[i] || 0);
+                const windSpeed = Math.round(daily.wind_speed_10m_max[i]);
+
+                const card = document.createElement('div');
+                card.className = 'col-lg-1-7 col-md-2 col-sm-3 col-6 mb-3';
+                card.style.flex = '0 0 calc(100% / 7)';
+                card.innerHTML = `
+                    <div class="forecast-card">
+                        <div class="forecast-day">${dayName}</div>
+                        <small style="opacity: 0.7;">${monthDay}</small>
+                        <div class="forecast-icon"><i class="${weatherInfo.icon}"></i></div>
+                        <div class="forecast-desc" style="font-size: 0.85em; margin-bottom: 8px;">${weatherInfo.desc}</div>
+                        <div class="forecast-temp" style="font-size: 1.1em;">${tempMax}°/${tempMin}°</div>
+                        <small style="display: block; margin: 5px 0;">💧 ${precipitation}mm</small>
+                        <small style="opacity: 0.7;"><i class="fas fa-wind"></i> ${windSpeed}km/h</small>
+                    </div>
+                `;
+                container.appendChild(card);
+            }
+        }
+
+        function showError(message) {
+            const errorContainer = document.getElementById('errorContainer');
+            errorContainer.innerHTML = `<div class="error-message"><i class="fas fa-exclamation-circle"></i> ${message}</div>`;
+            document.getElementById('loadingContainer').style.display = 'none';
+        }
+
+        // Initialize
+        window.addEventListener('DOMContentLoaded', () => {
+            updateDateTime();
+            setInterval(updateDateTime, 60000);
+            fetchWeather();
+            // Refresh weather every 30 minutes
+            setInterval(fetchWeather, 30 * 60 * 1000);
+        });
+    </script>
+</body>
+</html>
