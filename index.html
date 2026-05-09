@@ -243,6 +243,14 @@
                                 <div class="detail-label"><i class="fas fa-sunset"></i> Sunset</div>
                                 <div class="detail-value" id="sunset">--</div>
                             </div>
+                            <div class="detail-item">
+                                <div class="detail-label"><i class="fas fa-dollar-sign"></i> USD:</div>
+                                <div class="detail-value" id="usdRate">--</div>
+                            </div>
+                            <div class="detail-item">
+                                <div class="detail-label"><i class="fas fa-euro-sign"></i> EUR:</div>
+                                <div class="detail-value" id="eurRate">--</div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -530,9 +538,42 @@
                 
                 const data = await response.json();
                 displayWeather(data);
+                fetchExchangeRates();
             } catch (error) {
                 showError('Failed to load weather data. Please try again later.');
                 console.error(error);
+            }
+        }
+
+        async function fetchExchangeRates() {
+            try {
+                // Using open-exchange-rates free tier (no API key needed for basic requests)
+                const response = await fetch('https://open.er-api.com/v6/latest/USD');
+                if (!response.ok) throw new Error('Exchange rates fetch failed');
+                
+                const data = await response.json();
+                
+                if (data.rates && data.rates.ILS) {
+                    // Display USD/NIS (ILS is Israeli Shekel)
+                    const usdToNis = data.rates.ILS;
+                    document.getElementById('usdRate').textContent = usdToNis.toFixed(2) + ' NIS';
+                } else {
+                    throw new Error('NIS rate not found');
+                }
+                
+                // For EUR/NIS
+                const eurResponse = await fetch('https://open.er-api.com/v6/latest/EUR');
+                const eurData = await eurResponse.json();
+                if (eurData.rates && eurData.rates.ILS) {
+                    const eurToNis = eurData.rates.ILS;
+                    document.getElementById('eurRate').textContent = eurToNis.toFixed(2) + ' NIS';
+                } else {
+                    throw new Error('EUR rate not found');
+                }
+            } catch (error) {
+                document.getElementById('usdRate').textContent = 'N/A';
+                document.getElementById('eurRate').textContent = 'N/A';
+                console.error('Exchange rates error:', error);
             }
         }
 
