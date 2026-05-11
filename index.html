@@ -186,6 +186,36 @@
             opacity: 0.8;
             font-size: 0.95em;
         }
+
+        .on-this-day-container {
+            background-color: var(--card-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 10px;
+            padding: 20px;
+            margin-bottom: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+
+        .on-this-day-event {
+            padding: 15px;
+            border-left: 4px solid var(--primary-color);
+            margin-bottom: 15px;
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 5px;
+        }
+
+        .on-this-day-year {
+            font-weight: bold;
+            color: var(--primary-color);
+            font-size: 0.9em;
+            margin-bottom: 5px;
+        }
+
+        .on-this-day-text {
+            font-size: 0.95em;
+            line-height: 1.5;
+        }
     </style>
 </head>
 <body data-bs-theme="dark">
@@ -266,6 +296,12 @@
             <!-- Weekly Forecast -->
             <div class="section-title">7-Day Weekly Forecast</div>
             <div class="row" id="weeklyForecast"></div>
+
+            <!-- On this day -->
+            <div class="section-title"><i class="fas fa-history"></i> On This Day (Wikipedia)</div>
+            <div class="on-this-day-container" id="onThisDayContainer">
+                <p style="text-align: center; opacity: 0.7;">Loading...</p>
+            </div>
         </div>
     </div>
 
@@ -577,6 +613,55 @@
             }
         }
 
+        async function fetchOnThisDay() {
+            try {
+                const now = new Date();
+                const month = String(now.getMonth() + 1).padStart(2, '0');
+                const day = String(now.getDate()).padStart(2, '0');
+                
+                const response = await fetch(`https://en.wikipedia.org/api/rest_v1/feed/onthisday/events/${month}/${day}`);
+                if (!response.ok) throw new Error('Wikipedia fetch failed');
+                
+                const data = await response.json();
+                displayOnThisDay(data.events || []);
+            } catch (error) {
+                document.getElementById('onThisDayContainer').innerHTML = '<p style="text-align: center; opacity: 0.7;">Failed to load data</p>';
+                console.error('On this day error:', error);
+            }
+        }
+
+        function displayOnThisDay(events) {
+            const container = document.getElementById('onThisDayContainer');
+            
+            if (events.length === 0) {
+                container.innerHTML = '<p style="text-align: center; opacity: 0.7;">No events found</p>';
+                return;
+            }
+            
+            container.innerHTML = '';
+            
+            // Display up to 20 events
+            const eventsToShow = events.slice(0, 20);
+            
+            eventsToShow.forEach(event => {
+                const year = event.year || 'Unknown year';
+                const text = event.text || '';
+                const pages = event.pages || [];
+                
+                let eventHTML = `
+                    <div class="on-this-day-event">
+                        <div class="on-this-day-year">${year}</div>
+                        <div class="on-this-day-text">${text}`;
+                
+                if (pages.length > 0) {
+                    eventHTML += `<br><small style="opacity: 0.7;"><a href="https://en.wikipedia.org/wiki/${pages[0].title.replace(/ /g, '_')}" target="_blank" style="color: var(--primary-color);">Read more →</a></small>`;
+                }
+                
+                eventHTML += `</div></div>`;
+                container.innerHTML += eventHTML;
+            });
+        }
+
         function displayWeather(data) {
             const current = data.current;
             const hourly = data.hourly;
@@ -712,8 +797,11 @@
             updateDateTime();
             setInterval(updateDateTime, 60000);
             fetchWeather();
+            fetchOnThisDay();
             // Refresh weather every 30 minutes
             setInterval(fetchWeather, 30 * 60 * 1000);
+            // Refresh "On this day" once per day
+            setInterval(fetchOnThisDay, 24 * 60 * 60 * 1000);
         });
     </script>
 </body>
