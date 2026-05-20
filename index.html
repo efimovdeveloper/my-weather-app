@@ -188,6 +188,60 @@
             font-size: 0.95em;
         }
 
+        .location-change-form {
+            margin-top: 15px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.1);
+            border-radius: 8px;
+            display: none;
+        }
+
+        .location-change-form.active {
+            display: block;
+        }
+
+        .location-inputs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .location-inputs input {
+            padding: 8px 12px;
+            border: 1px solid var(--border-color);
+            border-radius: 5px;
+            background-color: var(--card-bg);
+            color: var(--text-color);
+            font-size: 0.9em;
+        }
+
+        .location-inputs button {
+            padding: 8px 15px;
+            background-color: var(--primary-color);
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.9em;
+        }
+
+        .location-inputs button:hover {
+            opacity: 0.9;
+        }
+
+        .location-toggle-btn {
+            margin-top: 5px;
+            padding: 5px 10px;
+            background-color: transparent;
+            border: 1px solid var(--border-color);
+            color: var(--text-color);
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 0.85em;
+        }
+
         .on-this-day-container {
             background-color: var(--card-bg);
             border: 1px solid var(--border-color);
@@ -230,8 +284,16 @@
 
     <div class="weather-container">
         <div class="location-info">
-            <h2><i class="fas fa-map-marker-alt"></i> Kiryat Yam, Israel</h2>
+            <h2><i class="fas fa-map-marker-alt"></i> <span id="locationName">Kiryat Yam, Israel</span></h2>
             <p id="currentDateTime"></p>
+            <button class="location-toggle-btn" onclick="toggleLocationForm()">⚙️ Change Location</button>
+            <div class="location-change-form" id="locationForm">
+                <div class="location-inputs">
+                    <input type="text" id="cityInput" placeholder="City" value="Kiryat Yam">
+                    <input type="text" id="countryInput" placeholder="Country" value="Israel">
+                    <button onclick="updateLocation()">Update</button>
+                </div>
+            </div>
         </div>
 
         <div id="loadingContainer" class="loading">
@@ -308,9 +370,76 @@
 
     <script src="https://cdnjs.cloudflare.com/ajax/libs/bootstrap/5.3.0/js/bootstrap.bundle.min.js"></script>
     <script>
-        const LOCATION_LAT = 32.8169;
-        const LOCATION_LON = 35.0739;
-        const API_URL = `https://api.open-meteo.com/v1/forecast?latitude=${LOCATION_LAT}&longitude=${LOCATION_LON}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,pressure_msl&hourly=temperature_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m,uv_index&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,sunrise,sunset&temperature_unit=celsius&wind_speed_unit=kmh&precipitation_unit=mm&timezone=auto`;
+        let LOCATION_LAT = 32.8169;
+        let LOCATION_LON = 35.0739;
+        let LOCATION_NAME = 'Kiryat Yam, Israel';
+        
+        function getAPIUrl() {
+            return `https://api.open-meteo.com/v1/forecast?latitude=${LOCATION_LAT}&longitude=${LOCATION_LON}&current=temperature_2m,relative_humidity_2m,apparent_temperature,precipitation,weather_code,wind_speed_10m,pressure_msl&hourly=temperature_2m,precipitation_probability,precipitation,weather_code,wind_speed_10m,uv_index&daily=weather_code,temperature_2m_max,temperature_2m_min,precipitation_sum,wind_speed_10m_max,sunrise,sunset&temperature_unit=celsius&wind_speed_unit=kmh&precipitation_unit=mm&timezone=auto`;
+        }
+
+        function toggleLocationForm() {
+            const form = document.getElementById('locationForm');
+            form.classList.toggle('active');
+        }
+
+        async function updateLocation() {
+            const city = document.getElementById('cityInput').value.trim();
+            const country = document.getElementById('countryInput').value.trim();
+            
+            // Validate input length
+            if (!city || !country) {
+                alert('Please enter both city and country');
+                return;
+            }
+            
+            if (city.length < 2 || country.length < 2) {
+                alert('City and country must be at least 2 characters long');
+                return;
+            }
+            
+            try {
+                // Use Nominatim API to geocode the location
+                const response = await fetch(`https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(city)},${encodeURIComponent(country)}&format=json&limit=1`);
+                const data = await response.json();
+                
+                if (data.length === 0) {
+                    alert('Location not found. Please try again with a different city/country.');
+                    return;
+                }
+                
+                const result = data[0];
+                
+                // Check if result has reasonable coordinates
+                const lat = parseFloat(result.lat);
+                const lon = parseFloat(result.lon);
+                
+                if (isNaN(lat) || isNaN(lon) || lat < -90 || lat > 90 || lon < -180 || lon > 180) {
+                    alert('Invalid coordinates returned. Please try again.');
+                    return;
+                }
+                
+                LOCATION_LAT = lat;
+                LOCATION_LON = lon;
+                LOCATION_NAME = `${city}, ${country}`;
+                
+                document.getElementById('locationName').textContent = LOCATION_NAME;
+                document.getElementById('locationForm').classList.remove('active');
+                
+                // Reload weather data
+                showLoading();
+                fetchWeather();
+                fetchOnThisDay();
+            } catch (error) {
+                alert('Failed to find location. Please try again.');
+                console.error('Location update error:', error);
+            }
+        }
+
+        function showLoading() {
+            document.getElementById('loadingContainer').style.display = 'block';
+            document.getElementById('weatherContent').style.display = 'none';
+        }
 
         const WMO_CODES = {
             0: { desc: 'Clear Sky', icon: 'fas fa-sun' },
@@ -570,7 +699,7 @@
 
         async function fetchWeather() {
             try {
-                const response = await fetch(API_URL);
+                const response = await fetch(getAPIUrl());
                 if (!response.ok) throw new Error('Weather data fetch failed');
                 
                 const data = await response.json();
